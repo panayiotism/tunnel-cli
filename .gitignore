@@ -1,0 +1,12 @@
+# Cloudflare Tunnel artifacts — never commit these
+# They live in ~/.cloudflared by default, but guard anyway in case of symlink/local override.
+cert.pem
+*.json
+.cloudflared/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

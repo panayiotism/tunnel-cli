@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Quick ephemeral tunnel — the ngrok-style one-liner.
+# Usage: tunnel <port> [host]
+#   tunnel 3000            -> exposes http://localhost:3000
+#   tunnel 3000 127.0.0.1  -> exposes http://127.0.0.1:3000
+
+set -euo pipefail
+
+if [[ $# -lt 1 || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$0"
+  exit 0
+fi
+
+port="$1"
+host="${2:-localhost}"
+target="http://${host}:${port}"
+
+if ! command -v cloudflared >/dev/null 2>&1; then
+  echo "cloudflared not found on PATH. Install with:" >&2
+  echo "  curl -fsSL -o ~/.local/bin/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 && chmod +x ~/.local/bin/cloudflared" >&2
+  exit 127
+fi
+
+echo "→ Starting quick tunnel to ${target}"
+echo "  (Ctrl-C to stop)"
+echo
+
+# cloudflared writes logs to stderr; pipe through awk to surface the public URL
+# in a single obvious line while keeping the rest of the output visible.
+exec cloudflared tunnel --no-autoupdate --url "${target}" 2>&1 | awk '
+  /https:\/\/[a-z0-9-]+\.trycloudflare\.com/ {
+    match($0, /https:\/\/[a-z0-9-]+\.trycloudflare\.com/)
+    url = substr($0, RSTART, RLENGTH)
+    if (url != last) {
+      printf "\n\033[1;32m▶ Public URL: %s\033[0m\n\n", url
+      last = url
+    }
+    fflush()
+    next
+  }
+  { print; fflush() }
+'

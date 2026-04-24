@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Named tunnel — stable URL on your own Cloudflare domain (for client demos).
+# Usage: tunnel-serve <subdomain.example.com> <port> [tunnel-name]
+#
+# Example:
+#   tunnel-serve demo.mysite.com 3000
+#
+# First run will open a browser for Cloudflare auth (one-time setup).
+# Subsequent runs reuse the cert and just route traffic.
+
+set -euo pipefail
+
+if [[ $# -lt 2 || "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$0"
+  exit 0
+fi
+
+hostname="$1"
+port="$2"
+tunnel_name="${3:-$(echo "$hostname" | tr '.' '-')}"
+cf_dir="${HOME}/.cloudflared"
+
+if ! command -v cloudflared >/dev/null 2>&1; then
+  echo "cloudflared not found on PATH." >&2
+  exit 127
+fi
+
+# 1. One-time browser login → produces ~/.cloudflared/cert.pem
+if [[ ! -f "${cf_dir}/cert.pem" ]]; then
+  echo "→ No Cloudflare cert found. Launching browser login..."
+  echo "  (Authorize the domain you want to use, then re-run this script.)"
+  cloudflared tunnel login
+  exit 0
+fi
+
+# 2. Create the tunnel if it doesn't exist yet (idempotent)
+if ! cloudflared tunnel list 2>/dev/null | awk 'NR>2 {print $2}' | grep -qx "${tunnel_name}"; then
+  echo "→ Creating tunnel '${tunnel_name}'"
+  cloudflared tunnel create "${tunnel_name}"
+else
+  echo "→ Reusing existing tunnel '${tunnel_name}'"
+fi
+
+# 3. Route the hostname to this tunnel (idempotent — safe to re-run)
+echo "→ Routing ${hostname} → ${tunnel_name}"
+cloudflared tunnel route dns --overwrite-dns "${tunnel_name}" "${hostname}" || true
+
+# 4. Run the tunnel against the requested local port
+echo "→ Serving http://localhost:${port} at https://${hostname}"
+echo "  (Ctrl-C to stop)"
+echo
+exec cloudflared tunnel --no-autoupdate run --url "http://localhost:${port}" "${tunnel_name}"
