@@ -6,7 +6,7 @@ A free, self-contained ngrok replacement built on [Cloudflare Tunnel](https://de
 
 ngrok's free tier is rate-limited and the random URL changes every restart. The paid plans start around $8/mo just for a stable URL. Cloudflare Tunnel gives you the same thing — plus unlimited bandwidth, HTTPS, and your own domain — for free.
 
-| | ngrok free | ngrok paid | ngrok-local (this) |
+| | ngrok free | ngrok paid | tunnel-cli (this) |
 |---|---|---|---|
 | Cost | free | $8–20+/mo | **free** |
 | Bandwidth | limited | limited | **unlimited** |
